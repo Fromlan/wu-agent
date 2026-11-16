@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>悟 · 个人知识工作台</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/chat-demo/theme.css">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到主要内容</a>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <a class="brand" href="#today">悟工作台</a>
+        <button class="icon-button sidebar-toggle" id="sidebar-toggle" type="button" aria-controls="workspace-nav" aria-expanded="true" aria-label="收起导航" title="收起导航"><i data-icon="sidebar"></i></button>
+      </div>
+      <nav id="workspace-nav" class="nav" aria-label="工作台导航">
+        <a href="#chat" class="nav-chat" data-page="chat" title="与悟对话"><i data-icon="chat"></i><span>与悟对话</span></a>
+        <a href="#today" data-page="today" aria-current="page" title="今日工作台"><i data-icon="grid"></i><span>今日工作台</span></a>
+        <a href="#inbox" data-page="inbox" title="研究收件箱"><i data-icon="inbox"></i><span>研究收件箱</span><span id="inbox-badge" class="nav-badge" hidden></span></a>
+        <a href="#library" data-page="library" title="我的知识库"><i data-icon="book"></i><span>我的知识库</span></a>
+        <a href="#agent" data-page="agent" title="研究追问（含旧对话）"><i data-icon="help"></i><span>研究追问</span><span id="question-badge" class="nav-badge" hidden></span></a>
+        <a href="#settings" class="nav-settings" data-page="settings" title="研究偏好"><i data-icon="sliders"></i><span>研究偏好</span></a>
+      </nav>
+      <a id="vault-link" class="sidebar-vault" title="打开 Obsidian" hidden><i data-icon="vault"></i><span>打开 Obsidian</span><i data-icon="external"></i></a>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <span id="connection" class="connection" data-tone="neutral"><span></span>连接中</span>
+      </header>
+      <main id="main" tabindex="-1">
+        <div id="notice" class="notice" hidden></div>
+        <section id="page-today" aria-labelledby="heading-today" class="page">
+          <header class="page-head">
+            <div><div class="date-label"><i data-icon="sun"></i><time id="today-date">每日研究</time></div><h1 id="heading-today">今日工作台</h1></div>
+            <button id="start-research" class="button primary" type="button" disabled><i data-icon="play"></i><span>立即研究</span></button>
+          </header>
+          <div class="workspace-grid today-grid">
+            <div class="page-stack">
+              <section class="research-card" aria-labelledby="hero-title">
+                <div id="hero-content" class="research-content"><div class="research-label">今日研究</div><h2 id="hero-title">正在读取今日研究</h2></div>
+              </section>
+              <section aria-labelledby="next-title">
+                <div class="section-head"><h2 id="next-title">待审卡片 <span id="next-count" class="count" hidden></span></h2><a id="all-pending" class="text-action" href="#inbox/pending" hidden>查看全部<i data-icon="arrow"></i></a></div>
+                <div id="next-cards" class="list-surface"></div>
+              </section>
+            </div>
+            <div class="page-stack workspace-side">
+              <section id="schedule-summary" class="side-panel"></section>
+              <section id="today-next" class="side-panel"></section>
+            </div>
+          </div>
+        </section>
+        <section id="page-chat" aria-labelledby="heading-chat" class="page" hidden>
+          <h1 id="heading-chat" class="sr-only">与悟对话</h1>
+          <iframe id="chat-demo-frame" title="与悟对话" class="chat-demo-frame" allow="microphone; clipboard-write"></iframe>
+        </section>
+        <section id="page-agent" aria-labelledby="heading-agent" class="page" hidden>
+          <header class="page-head">
+            <div><h1 id="heading-agent">研究追问</h1><p>回复研究中的问题，或回看旧对话。</p></div>
+            <a class="button secondary" href="#chat"><i data-icon="chat"></i>打开完整对话</a>
+          </header>
+          <div class="workspace-grid agent-grid">
+            <div class="chat-panel">
+              <div class="chat-head"><span class="agent-avatar"><i data-icon="logo"></i></span><div><strong>悟</strong><small id="chat-model">本地对话记录</small></div></div>
+              <div id="messages" class="messages" role="log" aria-label="与悟的对话" aria-live="polite"></div>
+              <form id="chat-form" class="composer">
+                <div id="reply-context" class="reply-context" hidden><span id="reply-text"></span><button type="button" class="icon-button" id="clear-reply" aria-label="取消关联追问"><i data-icon="close"></i></button></div>
+                <label for="message" class="sr-only">你的消息</label>
+                <textarea id="message" rows="2" maxlength="6000" placeholder="问一个问题，或告诉悟你想研究什么…" required></textarea>
+                <div class="composer-footer"><span>Ctrl / ⌘ + Enter</span><button id="send" type="submit" class="button primary send-button" aria-label="发送" title="发送" disabled><i data-icon="arrow-up"></i></button></div>
+              </form>
+            </div>
+            <div class="page-stack workspace-side">
+              <section id="chat-question" class="side-panel"></section>
+              <section id="chat-profile" class="side-panel"></section>
+            </div>
+          </div>
+        </section>
+        <section id="page-inbox" aria-labelledby="heading-inbox" class="page" hidden>
+          <header class="page-head">
+            <div><h1 id="heading-inbox">研究收件箱</h1><p>查看候选卡片、原文证据和每次研究的进度。</p></div>
+            <a id="inbox-link" class="button secondary" hidden><i data-icon="vault"></i>在 Obsidian 审阅<i data-icon="external"></i></a>
+          </header>
+          <nav class="view-nav" aria-label="收件箱视图">
+            <a id="cards-view-link" href="#inbox" aria-current="page">候选卡片</a>
+            <a id="history-view-link" href="#inbox/history">研究记录</a>
+          </nav>
+          <section id="inbox-candidates" aria-labelledby="cards-view-link">
+            <div class="toolbar">
+              <div class="filters" id="filters" aria-label="按审阅状态筛选"></div>
+              <label class="search-box"><i data-icon="search"></i><span class="sr-only">搜索候选卡片</span><input id="inbox-search" type="search" placeholder="搜索候选卡片" maxlength="120"></label>
+            </div>
+            <div id="inbox-cards" class="list-surface"></div>
+          </section>
+          <section id="history" class="list-surface" aria-labelledby="history-view-link" hidden></section>
+        </section>
+        <section id="page-library" aria-labelledby="heading-library" class="page" hidden>
+          <header class="page-head"><div><h1 id="heading-library">我的知识库</h1><p>从已收录的 Obsidian 笔记中查找知识。</p></div></header>
+          <div class="toolbar library-toolbar">
+            <label class="search-box"><i data-icon="search"></i><span class="sr-only">搜索正式笔记</span><input id="library-search" type="search" placeholder="搜索标题或正文" maxlength="120"></label>
+            <span id="library-count" role="status">正式笔记</span>
+          </div>
+          <div id="library-cards" class="list-surface"></div>
+        </section>
+        <section id="page-settings" aria-labelledby="heading-settings" class="page" hidden>
+          <header class="page-head"><div><h1 id="heading-settings">研究偏好</h1><p>设置研究主题、阅读习惯和交付时间。</p></div></header>
+          <div class="workspace-grid settings-grid">
+            <form id="settings-form" class="list-surface settings-form">
+              <section class="settings-section" aria-labelledby="preferences-heading">
+                <h2 id="preferences-heading">研究方向</h2>
+                <div class="setting-row"><label for="pref-topics">兴趣方向 <small>每行一个，最多 8 个</small></label><textarea id="pref-topics" rows="2" placeholder="例如：Agent 长期记忆"></textarea></div>
+                <div class="setting-row"><label for="pref-goal">学习目标</label><input id="pref-goal" maxlength="1000" placeholder="例如：搭建个人知识库"></div>
+                <div class="setting-row"><label for="pref-level">已有基础</label><input id="pref-level" maxlength="1000" placeholder="例如：会写脚本，熟悉 Obsidian"></div>
+                <div class="setting-row"><label for="pref-style">阅读习惯</label><input id="pref-style" maxlength="1000" placeholder="例如：先看案例，再看原理"></div>
+                <div class="setting-row"><label for="pref-avoid">减少推荐</label><input id="pref-avoid" maxlength="1000" placeholder="例如：重复的入门知识"></div>
+              </section>
+              <section id="delivery-settings" class="settings-section" aria-labelledby="delivery-heading" tabindex="-1">
+                <h2 id="delivery-heading">每日交付</h2>
+                <div class="setting-row"><label for="pref-time">研究时间 <small id="timezone"></small></label><input id="pref-time" type="time" required></div>
+                <label class="setting-row switch-row" for="pref-paused">
+                  <span>暂停自动研究<small>暂停后仍可手动发起。</small></span>
+                  <input id="pref-paused" class="switch" type="checkbox" role="switch">
+                </label>
+              </section>
+              <div class="settings-footer"><span id="save-status" role="status"></span><button id="save-settings" class="button primary" disabled>保存设置</button></div>
+            </form>
+            <div class="page-stack workspace-side">
+              <section id="question-queue" class="side-panel" aria-labelledby="queue-title" tabindex="-1">
+                <div class="panel-title"><span class="panel-icon"><i data-icon="spark"></i></span><h2 id="queue-title">后续研究</h2></div>
+                <form id="queue-form" class="queue-form">
+                  <label class="sr-only" for="queue-question">新研究问题</label>
+                  <input id="queue-question" required maxlength="500" placeholder="输入想继续研究的问题">
+                  <button id="add-question" class="button secondary compact" type="submit" disabled><i data-icon="plus"></i>加入待研究</button>
+                </form>
+                <div id="queue-list"></div>
+              </section>
+              <section id="storage" class="side-panel"></section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <dialog id="reader" aria-labelledby="reader-title">
+    <div class="reader-bar"><span id="reader-kind"></span><button id="close-reader" class="icon-button" type="button" aria-label="关闭卡片" title="关闭卡片"><i data-icon="close"></i></button></div>
+    <div id="reader-main" class="reader-main">
+      <h2 id="reader-title">正在读取</h2><div id="reader-meta" class="reader-meta"></div><div id="reader-body" class="prose"></div>
+    </div>
+    <div id="reader-actions" class="reader-actions"></div>
+  </dialog>
+  <dialog id="delete-confirmation" aria-labelledby="delete-title" aria-describedby="delete-message">
+    <div class="reader-main">
+      <h2 id="delete-title">删除候选卡片</h2>
+      <p id="delete-message"></p>
+    </div>
+    <form method="dialog" class="reader-actions">
+      <button class="button secondary compact" value="cancel" autofocus>取消</button>
+      <button class="button danger compact" value="delete">确认删除</button>
+    </form>
+  </dialog>
+  <div id="toast" role="status" class="toast" hidden></div>
+</body>
+</html>

@@ -1,0 +1,5 @@
+.env
+.wu-agent/
+vault/
+node_modules/
+*.log
