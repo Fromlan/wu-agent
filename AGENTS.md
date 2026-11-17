@@ -4,12 +4,13 @@ This repository is a DeepSeek Harness plugin bundle, not a standalone app. Its r
 
 ## Project Structure & Module Organization
 
-- `index.js` — Host half: vault configuration, the browser JSON API under `/plugin/dsh-knowledge-workbench`, the `schedule` integration, and tool registration.
+- `index.js` — Host half: vault configuration, the browser JSON API under `/plugin/dsh-knowledge-workbench`, the `schedule` integration (including pushing an edited research instruction to the daily task), and tool registration.
 - `lib/store.js` — vault operations: candidate cards, review transitions, preference/question mirrors, briefs, search.
 - `lib/tools.js` — the six agent tools. Keep raw JSON Schema shapes; this bundle intentionally imports nothing from the DSH installation.
 - `lib/note.js` — frontmatter parsing/rendering, card rendering, dates, note ids.
+- `lib/article.js` — structural checks for concept and comparison articles: required fields, length bounds, shared comparison dimensions, and the source-to-claim mapping. It cannot fetch a source or certify that a claim is true.
 - `lib/bases.js` — the Obsidian Bases `.base` document and the `确认` review constant. The file is seeded only when missing; never overwrite a user's edited base.
-- `lib/research.js` — daily and on-demand research prompts plus time validation.
+- `lib/research.js` — daily and on-demand research prompts plus time validation. `promptBody()` is the built-in instruction body: a keyword-first divergent thinking step (concept candidates, then pick one) before any dedupe search, and a concept-level filter that keeps operational detail out of the vault. A user-edited body is stored in vault state as an override, and an empty override keeps the built-in text.
 - `client.js` — browser half, registered through `window.__ModuleLoader__.load`. It must not import Harness Client packages; render controls with React elements and style only with `--dsw-alias-*` tokens.
 - `locale/` — `meta.title`, `meta.description`, and `meta.detail` for Plugin Manager.
 - `docs/` — the single-image detail documents.

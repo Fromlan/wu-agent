@@ -141,6 +141,21 @@ window.__ModuleLoader__.load({
       enableToast: '每日研究已开启',
       disableToast: '每日研究已停止',
       timeSavedToast: '研究时间已保存',
+      promptTitle: '研究指令',
+      promptHint: '每轮研究交给 agent 的步骤与约束；开头那句身份与触发说明由插件固定，这里编辑的是后面的正文。留空或恢复内置会跟随插件更新。',
+      promptBuiltin: '内置',
+      promptCustom: '已自定义',
+      savePrompt: '保存指令',
+      resetPrompt: '恢复内置',
+      promptSaved: '研究指令已保存，下一轮研究生效',
+      promptReset: '已恢复内置研究指令',
+      promptSyncHint: '每日任务保存的研究指令需要更新，同步后下次研究生效。',
+      promptSync: '同步研究指令',
+      promptSynced: '研究指令已同步到每日任务',
+      promptCustomHint: '自定义指令会覆盖新版内置流程；恢复内置可使用概念解释、比较与审读流程。',
+      tableLabel: '知识比较表，可横向滚动',
+      cardConcept: '概念解释',
+      cardComparison: '概念比较',
 
       prefsTitle: '研究偏好',
       prefsHint: '研究时按这些偏好挑选资料、组织问题和判断深浅。',
@@ -307,6 +322,21 @@ window.__ModuleLoader__.load({
       enableToast: 'Daily research enabled',
       disableToast: 'Daily research stopped',
       timeSavedToast: 'Research time saved',
+      promptTitle: 'Research instruction',
+      promptHint: 'The steps and constraints every round receives. The opening line is fixed; this edits the body. Reset or leave it empty to follow plugin updates.',
+      promptBuiltin: 'Built-in',
+      promptCustom: 'Customized',
+      savePrompt: 'Save instruction',
+      resetPrompt: 'Reset to built-in',
+      promptSaved: 'Instruction saved; it applies to the next round',
+      promptReset: 'Built-in research instruction restored',
+      promptSyncHint: 'The daily task needs the current instruction. Sync it for the next run.',
+      promptSync: 'Sync research instruction',
+      promptSynced: 'Research instruction synced to the daily task',
+      promptCustomHint: 'Custom instructions override the updated workflow. Reset to built-in for concept explanations, comparisons and editorial review.',
+      tableLabel: 'Knowledge comparison table; scroll horizontally',
+      cardConcept: 'Concept explanation',
+      cardComparison: 'Concept comparison',
 
       prefsTitle: 'Research preferences',
       prefsHint: 'Research uses these to choose material, shape questions, and set depth.',
@@ -409,8 +439,9 @@ window.__ModuleLoader__.load({
 
     function stripLeadingTitle(body, title) {
       const lines = String(body || '').replace(/\r\n/g, '\n').split('\n');
-      if (lines.length && /^#\s+/.test(lines[0]) && lines[0].replace(/^#\s+/, '').trim() === String(title || '').trim()) {
-        return lines.slice(1).join('\n');
+      const first = lines.findIndex(line => line.trim());
+      if (first >= 0 && /^#\s+/.test(lines[first]) && lines[first].replace(/^#\s+/, '').trim() === String(title || '').trim()) {
+        return lines.slice(first + 1).join('\n');
       }
       return body;
     }
@@ -786,7 +817,22 @@ window.__ModuleLoader__.load({
         const heading = line.match(/^(#{1,4})\s+(.*)$/);
         if (heading) {
           flush();
-          const level = Math.min(heading[1].length + 1, 5);
+          if (props.foldEvidence !== false && heading[1].length === 2 && ['来源', '审读记录'].includes(heading[2].trim())) {
+            const section = [];
+            let fenced = false;
+            index += 1;
+            while (index < lines.length) {
+              if (!fenced && /^#{1,2}\s+/.test(lines[index])) break;
+              if (/^\s*```/.test(lines[index])) fenced = !fenced;
+              section.push(lines[index]);
+              index += 1;
+            }
+            push(h('details', { className: 'kbw-evidence' },
+              h('summary', null, heading[2]),
+              h(Markdown, { text: section.join('\n'), prefix: `${keyBase}-e${blocks.length}`, foldEvidence: false, tableLabel: props.tableLabel })));
+            continue;
+          }
+          const level = Math.max(2, heading[1].length);
           push(h(`h${level}`, null, inlineNodes(heading[2], `${keyBase}-h${blocks.length}`)));
           index += 1;
           continue;
@@ -808,7 +854,7 @@ window.__ModuleLoader__.load({
             rows.push(splitRow(lines[index]));
             index += 1;
           }
-          push(h('table', null,
+          push(h('div', { className: 'kbw-table-scroll', role: 'region', 'aria-label': props.tableLabel || zh.tableLabel, tabIndex: 0 }, h('table', null,
             h('thead', null, h('tr', null, header.map((cell, cellIndex) => h('th', {
               key: `th${cellIndex}`,
               className: `kbw-align-${align[cellIndex] || 'left'}`,
@@ -817,7 +863,7 @@ window.__ModuleLoader__.load({
               row.map((cell, cellIndex) => h('td', {
                 key: `td${cellIndex}`,
                 className: `kbw-align-${align[cellIndex] || 'left'}`,
-              }, inlineNodes(cell, `${keyBase}-td${blocks.length}-${rowIndex}-${cellIndex}`))))))));
+              }, inlineNodes(cell, `${keyBase}-td${blocks.length}-${rowIndex}-${cellIndex}`)))))))));
           continue;
         }
         if (/^\s*[-*+]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
@@ -891,6 +937,8 @@ window.__ModuleLoader__.load({
       const [digQuestion, setDigQuestion] = React.useState('');
       const [questionDraft, setQuestionDraft] = React.useState('');
       const [researchTime, setResearchTime] = React.useState('09:00');
+      const [promptDraft, setPromptDraft] = React.useState('');
+      const [promptDirty, setPromptDirty] = React.useState(false);
       const [copied, setCopied] = React.useState('');
       const [form, setForm] = React.useState({ topics: '', level: '', goal: '', style: '', avoid: '' });
       const [formDirty, setFormDirty] = React.useState(false);
@@ -902,12 +950,14 @@ window.__ModuleLoader__.load({
       const rowRefs = React.useRef({});
       const formDirtyRef = React.useRef(false);
       const researchServerTime = React.useRef('');
+      const promptDirtyRef = React.useRef(false);
       const autoCardRef = React.useRef(false);
       const selectedCardRef = React.useRef(null);
       const stateSeq = React.useRef(0);
 
       React.useEffect(() => () => { alive.current = false; }, []);
       React.useEffect(() => { formDirtyRef.current = formDirty; }, [formDirty]);
+      React.useEffect(() => { promptDirtyRef.current = promptDirty; }, [promptDirty]);
       React.useEffect(() => { selectedCardRef.current = selectedCardId; }, [selectedCardId]);
 
       const load = React.useCallback(async (options) => {
@@ -929,6 +979,10 @@ window.__ModuleLoader__.load({
           if (data.research && typeof data.research.time === 'string' && data.research.time !== researchServerTime.current) {
             researchServerTime.current = data.research.time;
             setResearchTime(data.research.time);
+          }
+          if (data.research && typeof data.research.defaultPrompt === 'string' && !promptDirtyRef.current) {
+            const stored = typeof data.research.prompt === 'string' ? data.research.prompt : '';
+            setPromptDraft(stored || data.research.defaultPrompt);
           }
           setForm(current => {
             if ((options && options.resetForm) || !formDirtyRef.current) {
@@ -1147,9 +1201,26 @@ window.__ModuleLoader__.load({
 
       const researchAction = React.useCallback(async (action, extra, message) => {
         const result = await act('research', { action, ...(extra || {}) });
-        if (!result) return;
+        if (!result) return null;
         if (message) notify(t(message));
+        return result;
       }, [act, notify, t]);
+
+      const saveResearchPrompt = React.useCallback(async () => {
+        const result = await researchAction('save-prompt', { prompt: promptDraft }, 'promptSaved');
+        if (!result) return;
+        setPromptDirty(false);
+        const next = result.state && result.state.research;
+        if (next) setPromptDraft(next.prompt || next.defaultPrompt || '');
+      }, [promptDraft, researchAction]);
+
+      const resetResearchPrompt = React.useCallback(async () => {
+        const result = await researchAction('save-prompt', { prompt: '' }, 'promptReset');
+        if (!result) return;
+        setPromptDirty(false);
+        const next = result.state && result.state.research;
+        if (next) setPromptDraft(next.prompt || next.defaultPrompt || '');
+      }, [researchAction]);
 
       const copyText = React.useCallback(async value => {
         try {
@@ -1517,6 +1588,8 @@ window.__ModuleLoader__.load({
               onClick: () => { setSelectedCardId(null); setCardBody(null) },
             }, h(Icon, { name: 'left', size: 15 }), t('back')),
             h('h2', { className: 'kbw-detail-title' }, card.title),
+            card.meta && ['concept', 'comparison'].includes(card.meta.card_type)
+              ? h('span', { className: 'kbw-article-type' }, t(card.meta.card_type === 'comparison' ? 'cardComparison' : 'cardConcept')) : null,
             h('div', { className: 'kbw-detail-meta' },
               h(Chip, { tone }, t(REVIEW_LABEL[status] || 'statusPending')),
               card.meta && card.meta.created ? h('span', null, `${t('createdLabel')} ${card.meta.created}`) : null,
@@ -1581,7 +1654,7 @@ window.__ModuleLoader__.load({
                 h(Button, { variant: 'primary', small: true, disabled: busy || !digQuestion.trim(), onClick: () => { void submitDig() } }, t('digSubmit')),
                 h(Button, { variant: 'ghost', small: true, onClick: () => { setDigOpen(false); setDigQuestion('') } }, t('digCancel')))) : null),
           h('div', { className: 'kbw-detail-scroll', ref: readerRef },
-            h(Markdown, { text: stripLeadingTitle(card.body, card.title), prefix: `card-${card.id}` }),
+            h(Markdown, { text: stripLeadingTitle(card.body, card.title), prefix: `card-${card.id}`, tableLabel: t('tableLabel') }),
             h('div', { className: 'kbw-pathbar' },
               h('span', { className: 'kbw-pathbar-label' }, t('notePath')),
               h('code', { title: card.absolute || card.path }, card.path),
@@ -1641,7 +1714,7 @@ window.__ModuleLoader__.load({
                             noteBody.meta && noteBody.meta.created ? h('span', null, `${t('createdLabel')} ${noteBody.meta.created}`) : null,
                             (noteBody.tags || []).map(tag => h('span', { className: 'kbw-row-tag', key: tag }, `#${tag}`)))),
                         h('div', { className: 'kbw-detail-scroll', ref: readerRef },
-                          h(Markdown, { text: stripLeadingTitle(noteBody.body, noteBody.title), prefix: `note-${noteBody.id}` }),
+                          h(Markdown, { text: stripLeadingTitle(noteBody.body, noteBody.title), prefix: `note-${noteBody.id}`, tableLabel: t('tableLabel') }),
                           h('div', { className: 'kbw-pathbar' },
                             h('span', { className: 'kbw-pathbar-label' }, t('notePath')),
                             h('code', { title: noteBody.readPath || noteBody.path }, noteBody.path),
@@ -1710,6 +1783,33 @@ window.__ModuleLoader__.load({
                 h('dd', null, research.enabled ? nextRun : t('never')),
                 h('dt', null, t('lastRun')),
                 h('dd', null, lastRun)),
+              research.needsPromptSync
+                ? h('div', { className: 'kbw-prompt-update' },
+                    h('p', { className: 'kbw-hint' }, t('promptSyncHint')),
+                    h(Button, { small: true, disabled: busy || !research.available, onClick: () => { void researchAction('sync-prompt', {}, 'promptSynced') } }, t('promptSync')))
+                : null,
+              h('details', { className: 'kbw-prompt' },
+                h('summary', null,
+                  h('span', null, t('promptTitle')),
+                  h('span', { className: 'kbw-rail-state' }, research.prompt ? t('promptCustom') : t('promptBuiltin'))),
+                h('p', { className: 'kbw-hint' }, t('promptHint')),
+                research.prompt ? h('p', { className: 'kbw-hint' }, t('promptCustomHint')) : null,
+                h('textarea', {
+                  className: 'kbw-textarea kbw-prompt-input',
+                  'aria-label': t('promptTitle'),
+                  spellCheck: false,
+                  value: promptDraft,
+                  onChange: event => {
+                    setPromptDraft(event.target.value);
+                    setPromptDirty(true);
+                  },
+                }),
+                h('div', { className: 'kbw-form-row' },
+                  h(Button, { variant: 'primary', small: true, disabled: busy || !promptDirty, onClick: () => { void saveResearchPrompt() } }, t('savePrompt')),
+                  research.prompt
+                    ? h(Button, { small: true, disabled: busy, onClick: () => { void resetResearchPrompt() } }, t('resetPrompt'))
+                    : null,
+                  promptDirty ? h('span', { className: 'kbw-unsaved' }, h(Dot, { tone: 'warn' }), t('unsaved')) : null)),
               h('p', { className: 'kbw-hint' }, t('researchHint'))),
             h('div', { className: 'kbw-rail-block kbw-rail-block--list' },
               h('div', { className: 'kbw-rail-title' },
@@ -2046,7 +2146,7 @@ window.__ModuleLoader__.load({
   --kbw-warn:var(--dsw-alias-state-warn-primary);
   --kbw-warn-label:var(--dsw-alias-state-warn-label);
   --kbw-ok:var(--dsw-alias-state-success-primary);
-  --kbw-body-size:14px;
+  --kbw-body-size:15px;
   --kbw-small-size:13px;
   --kbw-mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   position:relative;display:flex;flex-direction:column;height:100%;max-height:100dvh;min-height:0;
@@ -2155,7 +2255,7 @@ window.__ModuleLoader__.load({
 .kbw-dig{display:flex;flex-direction:column;gap:6px;padding-top:4px}
 
 /* text */
-.kbw-md{max-width:70ch;font-size:var(--kbw-body-size);line-height:1.75;color:var(--kbw-ink);overflow-wrap:anywhere}
+.kbw-md{max-width:72ch;font-size:var(--kbw-body-size);line-height:1.9;color:var(--kbw-ink);overflow-wrap:anywhere}
 .kbw-md>*:first-child{margin-top:0}
 .kbw-md>*:last-child{margin-bottom:0}
 .kbw-md p{margin:0 0 .85em;text-wrap:pretty}
@@ -2177,6 +2277,14 @@ window.__ModuleLoader__.load({
 .kbw-md a:hover{border-bottom-color:currentColor}
 .kbw-md hr{margin:1.8em 0;border:0;border-top:1px solid var(--kbw-line)}
 .kbw-md table{width:100%;margin:1em 0;border-collapse:collapse;font-size:.94em}
+.kbw-table-scroll{max-width:100%;overflow-x:auto;margin:1em 0;scrollbar-width:thin}
+.kbw-table-scroll table{min-width:520px;margin:0}
+.kbw-evidence{margin:1.4em 0;border-top:1px solid var(--kbw-line);padding-top:.65em;color:var(--kbw-ink-2)}
+.kbw-evidence>summary{cursor:pointer;font-size:.9em;font-weight:600}
+.kbw-evidence[open]>summary{margin-bottom:.8em}
+.kbw-evidence .kbw-md{font-size:.92em}
+.kbw-article-type{align-self:flex-start;color:var(--kbw-ink-3);font-size:11px}
+.kbw-prompt-update{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:10px 0}
 .kbw-md th,.kbw-md td{padding:6px 10px;border-bottom:1px solid var(--kbw-line);vertical-align:top;text-align:left}
 .kbw-md th{font-weight:600;font-size:.92em;color:var(--kbw-ink-2)}
 .kbw-md img{max-width:100%;height:auto;border-radius:6px}
@@ -2245,14 +2353,14 @@ window.__ModuleLoader__.load({
 .kbw-switch:disabled{opacity:.5;cursor:default}
 
 /* research rail */
-.kbw-rail{background:transparent}
+.kbw-rail{background:transparent;overflow-y:auto;scrollbar-width:thin}
 .kbw-rail-block{flex:none;display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-bottom:1px solid var(--kbw-line)}
 .kbw-rail-block--list{border-bottom:0;padding-bottom:6px;gap:4px}
 .kbw-rail-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;font-weight:600;color:var(--kbw-ink)}
 .kbw-rail-heading{display:inline-flex;align-items:baseline;gap:8px;min-width:0}
 .kbw-rail-state{font-size:11px;font-weight:400;color:var(--kbw-ink-3);white-space:nowrap}
 .kbw-rail-count{font-size:10.5px;font-weight:500;color:var(--kbw-ink-3);font-variant-numeric:tabular-nums}
-.kbw-rail-list{flex:1;min-height:0;padding-top:0}
+.kbw-rail-list{flex:1;min-height:140px;padding-top:0}
 .kbw-facts{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;margin:0;font-size:10.8px;color:var(--kbw-ink-2)}
 .kbw-facts dt{color:var(--kbw-ink-3)}
 .kbw-facts dd{margin:0;font-variant-numeric:tabular-nums}
@@ -2260,6 +2368,14 @@ window.__ModuleLoader__.load({
 .kbw-hint--warn{color:var(--kbw-warn-label)}
 .kbw-hint--queued{display:flex;align-items:flex-start;gap:5px;color:var(--kbw-ink-2)}
 .kbw-hint--queued svg{flex:none;margin-top:2px;color:var(--kbw-accent)}
+.kbw-prompt{border-top:1px solid var(--kbw-line);padding-top:10px}
+.kbw-prompt summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:12px;font-weight:600;color:var(--kbw-ink);list-style:none}
+.kbw-prompt summary::-webkit-details-marker{display:none}
+.kbw-prompt summary:focus-visible{border-radius:4px;outline:2px solid color-mix(in srgb,var(--kbw-accent) 36%,transparent);outline-offset:2px}
+.kbw-prompt[open] summary{margin-bottom:8px}
+.kbw-prompt-input{min-height:200px;max-height:40vh;font-family:var(--kbw-mono);font-size:11.5px;line-height:1.65}
+.kbw-prompt .kbw-hint{margin-bottom:8px}
+.kbw-prompt .kbw-form-row{margin-top:8px}
 
 /* prefs */
 .kbw-columns{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:30px;align-content:start;padding:18px 0 48px;scrollbar-width:thin}

@@ -15,7 +15,7 @@ import path from 'node:path';
 import { KnowledgeStore, messageOf } from './lib/store.js';
 import { registerTools } from './lib/tools.js';
 import { machineTimeZone } from './lib/note.js';
-import { dailyPrompt, nowPrompt, normalizeTime, researchTitle } from './lib/research.js';
+import { dailyPrompt, nowPrompt, normalizePrompt, normalizeTime, promptBody, researchTitle, RESEARCH_PROMPT_REVISION } from './lib/research.js';
 
 /** Route prefix owned by this plugin. */
 export const ROUTE = '/plugin/dsh-knowledge-workbench';
@@ -260,6 +260,9 @@ async function researchStatus(store, service) {
     enabled: Boolean(task && task.status === 'active'),
     time: state.dailyAt,
     id: state.researchScheduleId || null,
+    prompt: typeof state.researchPrompt === 'string' ? state.researchPrompt : '',
+    defaultPrompt: promptBody(),
+    needsPromptSync: Boolean(task && state.researchPromptRevision !== RESEARCH_PROMPT_REVISION),
     status: task ? task.status : state.researchScheduleId ? 'missing' : 'off',
     nextRunAt: task && task.status === 'active' ? task.scheduledAt : null,
     lastDelivery: task && task.lastDelivery
@@ -299,13 +302,58 @@ async function queuedRun(state, service) {
  * Run one research-panel operation.
  * @param {KnowledgeStore} store - vault store.
  * @param {object|undefined} service - schedule service.
- * @param {Record<string, unknown>} body - action and optional time.
+ * @param {Record<string, unknown>} body - action, optional time, optional prompt.
  * @returns {Promise<{research: object}>} the new research row.
  */
 async function researchAction(store, service, body) {
   const action = String(body.action || '');
-  if (!service) throw new Error('当前 profile 没有 schedule 服务，无法启动研究任务');
   const state = await store.readState();
+  const custom = typeof state.researchPrompt === 'string' ? state.researchPrompt : '';
+  if (action === 'save-prompt') {
+    const value = normalizePrompt(body.prompt);
+    // Text equal to the built-in body is stored as "no override", so plugin
+    // updates to the default instruction still reach this vault.
+    const prompt = value === promptBody() ? '' : value;
+    await store.updateState(current => {
+      current.researchPrompt = prompt;
+      current.researchPromptRevision = '';
+      return current;
+    });
+    if (service && state.researchScheduleId) {
+      // The schedule task carries its own copy of the prompt; push the new one
+      // now so the next run does not need a disable/enable cycle.
+      try {
+        const edited = await service.edit({
+          id: state.researchScheduleId,
+          action: 'update',
+          patch: { prompt: dailyPrompt(prompt) },
+        });
+        if (edited && edited.code) throw new Error('每日任务更新被拒绝');
+        await store.updateState(current => {
+          current.researchPromptRevision = RESEARCH_PROMPT_REVISION;
+          return current;
+        });
+      } catch (error) {
+        throw new Error(`研究指令已保存，但更新每日任务失败：${messageOf(error)}`);
+      }
+    }
+    return { research: await researchStatus(store, service) };
+  }
+  if (!service) throw new Error('当前 profile 没有 schedule 服务，无法启动研究任务');
+  if (action === 'sync-prompt') {
+    if (!state.researchScheduleId) throw new Error('没有可同步的每日研究任务，请先开启每日研究');
+    const edited = await service.edit({
+      id: state.researchScheduleId,
+      action: 'update',
+      patch: { prompt: dailyPrompt(custom) },
+    });
+    if (edited && edited.code) throw new Error('每日研究指令同步失败，请重新开启每日研究');
+    await store.updateState(current => {
+      current.researchPromptRevision = RESEARCH_PROMPT_REVISION;
+      return current;
+    });
+    return { research: await researchStatus(store, service) };
+  }
   if (action === 'save-time') {
     const time = normalizeTime(body.time);
     await store.updateState(current => {
@@ -340,15 +388,16 @@ async function researchAction(store, service, body) {
       }
     }
     const timing = { kind: 'daily', daily: { time, time_zone: store.timeZone } };
+    const prompt = dailyPrompt(custom);
     let entry;
     if (task) {
-      const edited = await service.edit({ id: state.researchScheduleId, action: 'update', patch: { timing, active: true } });
+      const edited = await service.edit({ id: state.researchScheduleId, action: 'update', patch: { timing, active: true, prompt } });
       if (edited && edited.code) throw new Error('每日研究任务状态异常，请先关闭再重新开启');
       entry = edited;
     } else {
       entry = await service.create({
         title: researchTitle('daily'),
-        prompt: dailyPrompt(),
+        prompt,
         timing,
         target: { kind: 'new' },
       });
@@ -356,6 +405,7 @@ async function researchAction(store, service, body) {
     await store.updateState(current => {
       current.dailyAt = time;
       current.researchScheduleId = entry.id;
+      current.researchPromptRevision = RESEARCH_PROMPT_REVISION;
       return current;
     });
     return { research: await researchStatus(store, service) };
@@ -363,7 +413,7 @@ async function researchAction(store, service, body) {
   if (action === 'start') {
     const entry = await service.create({
       title: researchTitle('now', store.today),
-      prompt: nowPrompt(),
+      prompt: nowPrompt(custom),
       timing: { kind: 'after', after_seconds: 10 },
       target: { kind: 'new' },
     });

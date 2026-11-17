@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-knowledge-workbench",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "description": "Local-first knowledge workbench for DeepSeek Harness: research cards, human review, and a permanent Markdown library.",
