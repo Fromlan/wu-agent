@@ -1,0 +1,5 @@
+# Adds the knowledge workbench's Host half. The bundle's own client half is
+# discovered from package.json `dsh.client`; no second row is needed.
+- insert:
+    - id: knowledge-workbench
+      name: '@local/dsh-knowledge-workbench'

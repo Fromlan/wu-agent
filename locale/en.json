@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Knowledge workbench",
+    "description": "A local-first knowledge workbench built around one loop: research, review, publish. It adds a Knowledge panel (book icon in the sidebar panel list) where you manage an Obsidian-friendly Markdown vault: candidate cards in inbox/, confirmed notes in library/, and one research brief per day in briefs/. The vault root also gets a 知识工作台.base Obsidian Bases database with table and card views for the review queue, library, and briefs; editing review to 确认 in the Bases table publishes the card too. It also gives the agent six knowledge_* tools to read the workbench, capture cards with verbatim sources, search your notes, queue follow-up questions, and write the daily brief. An optional daily research schedule starts a normal Harness session that reuses your current model and web tools; research only writes candidates, and only you can publish a card from the workbench or Bases. Nothing leaves the machine except the model and web requests you already use. Disabling the plugin leaves every Markdown file in place.",
+    "detail": "docs/DETAIL.md"
+  }
+}

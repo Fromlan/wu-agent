@@ -1,76 +1,124 @@
-# 悟 · 个人知识工作台
+# 知识工作台 · DSH 插件
 
-DeepSeek 驱动的本地知识助手。主动询问兴趣与习惯，每天查阅资料生成知识卡片，在 Obsidian 确认后发布到永久知识库。使用 Node.js 内置 HTTP、文件和定时器能力，零运行依赖。
+DeepSeek Harness 的本地知识工作台插件。它把「研究 → 审阅 → 入库」做成一个常驻循环：agent 查资料、写候选卡片，你在侧栏工作台或 Obsidian Bases 数据库里确认，确认后的卡片成为正式笔记。所有内容是本机 Markdown，可以直接用 Obsidian 打开。
 
-## 启动
+这个仓库是原「悟 · 个人知识工作台」原型在 DSH 上的插件化版本：原型里的本地仓库、候选卡审阅、每日研究、后续问题与偏好，分别落到了 DSH 的 Markdown 仓库、槽位页面、`schedule` 服务和工具注册表里。仓库现在生成 Obsidian Bases `.base` 文件，把候选卡、正式笔记和研究简报变成可筛选、分组、排序的数据库视图。
 
-需要 Node.js 22.12 或更新版本。
+## 位置
 
-1. 将 `.env.example` 复制为 `.env`，填入自己的 `DEEPSEEK_API_KEY`。密钥只由本地服务读取。
-2. Windows 下双击项目根目录的 `start.cmd`。脚本检查 Node.js 版本，缺少 `.env` 时从示例创建，服务就绪后自动打开浏览器。保持启动窗口打开，按 `Ctrl+C` 停止服务。启动失败时窗口会保留错误信息。
-3. 在「今日工作台」点「设置研究主题」，或在「研究追问与旧对话」告诉悟你的兴趣、基础与阅读习惯。默认地址为 <http://127.0.0.1:4317>，修改 `PORT` 后会打开对应地址。已有服务运行时，先在原启动窗口按 `Ctrl+C`，再重新打开 `start.cmd` 加载新版。
-4. 在 Obsidian 选择「打开本地仓库」，打开项目下的 `vault` 文件夹。首次启动服务会创建它。
-5. 在「今日工作台」点「立即研究」，或等待设定时间。当天第一轮也算作当日的定时研究，完成后可手动再跑一轮。各轮进度、简报和后续问题都在「研究收件箱 → 研究记录」。
-6. 在「研究收件箱」点开卡片阅读结论与原文证据。点「在 Obsidian 审阅」，将候选笔记的 `review` 设为 `确认`。服务发布后，「我的知识库」会出现正式笔记，支持搜索标题与正文。`暂缓` 和 `跳过` 可在收件箱筛选。点详情里的「删除候选」，可将候选文件移到 Vault 的 `.trash/wu-agent/`，正式笔记仍保存在知识库。
+- **面板**：左侧面板图标列表里的书本图标「知识工作台」，与「插件」「定时任务」同一列。
+- **数据库**：仓库根目录的 `知识工作台.base`，用 Obsidian 1.9+ 的 Bases 打开，含待审阅、收件箱、知识库（卡片/表格）、研究简报和全部笔记视图。
+- **工具**：`knowledge_status`、`knowledge_capture`、`knowledge_search`、`knowledge_read`、`knowledge_ask`、`knowledge_brief`。
+- **排程**：在「知识工作台 → 研究记录」开启每日研究，任务由 DSH 的 `schedule` 服务托管，运行在一个普通新会话里。
 
-候选卡的「继续深挖」可提交一个具体问题。它会出现在「研究偏好 → 后续研究」，按加入顺序被研究选中。该轮生成卡片并交付后，问题从队列移除；证据不足或失败会保留。收藏和继续深挖是两个操作。
+## 安装
 
-服务运行时，关闭浏览器或 Obsidian 仍可研究。退出服务后定时任务暂停，重新启动会恢复未完成任务，并在当天已过交付时间时补跑当天任务。日期按配置时区计算。多日离线后只生成当天的一份日报。
+用 DSH 的 **Plugins → 添加插件 → 本地目录**，选择这个仓库根目录；或在本机已安装时用：
 
-终端启动可使用 `node src/server.mjs`。运行 `start.cmd --no-open` 可启动服务并省略浏览器打开步骤。
+```powershell
+# 在 DSH 的 Creator/管理会话里，让 agent 执行 install_bundle
+# target = 本仓库根目录的绝对路径
+```
 
-## 完整对话
+安装后插件行是 `@local/dsh-knowledge-workbench`，Host 半与浏览器半同时生效。
 
-导航中的「与悟对话」接入了 DeepSeek 官方 Chat Demo。支持多会话、重命名与删除，编辑提问、重新生成和切换回答版本，流式回复、停止和续写、深度思考、智能搜索、读取链接及引用来源。回复渲染支持 Markdown 表格、任务列表、代码高亮、KaTeX 公式和 Mermaid 图表。输入区支持上传、粘贴与拖放附件，允许麦克风后可以语音输入，并可朗读回复。
+## 界面
 
-设置提供中英文、主题、地区与音色，以及 ZIP 历史导入和导出。新会话保存在当前浏览器的 IndexedDB，内嵌界面和同地址的独立窗口共用会话。历史导入按 Chat Demo 的行为，确认后替换当前浏览器中的完整对话。研究追问及此前用悟生成的对话可以在「研究追问与旧对话」打开，继续记录在 `.wu-agent/sessions/`。
+整页是一屏分栏，不做整页滚动：
 
-完整对话使用 DeepSeek 的 `deepseek-flash`。本地服务使用 `.env` 的密钥转发聊天、附件和语音请求，并在聊天请求中带上研究偏好和匹配的已收录笔记。需要相应的 DeepSeek 接口权限与余额。
+- **顶栏**：面板名与一句上下文（日期、待审阅/暂缓/已入库的数量），右侧是研究状态（点一下跳到研究视图）、刷新和「立即研究」。研究排队后会显示「研究已排队」，跑完自动消失。
+- **标签**：收件箱 / 知识库 / 研究 / 偏好与问题，下划线样式，后面的数字是各自待处理的数量。
+- **收件箱**：左侧列表逐条展示标题、摘要、日期与标签；每行右侧可直接「确认入库 / 暂缓 / 跳过」，不用先打开卡片，也不会把正在阅读的卡片切走。右侧阅读区单独滚动，确认当前卡片后自动跳到下一张待审阅卡片。
+- **知识库 / 研究**：同样的左列表右阅读。知识库为空时会说明怎么用 Obsidian 打开 `知识工作台.base`；研究视图左侧是每日研究与简报列表，右侧是选中的简报。
+- **偏好与问题**：左栏编辑偏好（兴趣会显示成可删除的标签），右栏管理排队问题；未保存时标题旁有提示。
+- **底栏**：仓库与 `知识工作台.base` 的路径（可复制），以及当前视图的快捷键提示。
 
-已构建的 Chat Demo 随项目提供，启动时由 Node 直接读取。修改上游适配时，用 PowerShell 运行 `./scripts/build-chat-demo.ps1`（需要 pnpm）。脚本按固定 GitHub 提交构建 `public/chat-demo/`，该目录包含 MIT 许可证和依赖许可声明。
+键盘：`j` / `k` 在列表中移动并打开，`a` 确认、`h` 暂缓、`s` 跳过（作用于当前焦点行或已打开的卡片），`/` 搜索，`Esc` 清除搜索或取消删除。窄屏（≤840px）下列表与阅读区切换为单栏，阅读区左上角有返回按钮。所有颜色、字号和边框都来自 DSH 主题 token，跟随浅色/深色主题；标题、简介与下划线标签也按 DSH 插件页的字号与 44px 标签条对齐。
 
-## 配置
+## 循环
 
-修改 `.env` 后重启。默认 Vault 位于项目内，定时研究默认每天 Asia/Shanghai 时间 09:00 运行。每轮最多 3 张卡、3 个搜索词和 4 次来源抓取。可以修改 `VAULT_PATH`、`DAILY_AT`、`TIMEZONE`、`DAILY_CARD_LIMIT`、`RESEARCH_QUERY_LIMIT`、`RESEARCH_SOURCE_LIMIT`。工作台中的「研究偏好」可直接修改兴趣、基础、目标、阅读习惯和希望减少的内容。也可以设置每日时间（优先于 `.env` 的默认值）与暂停自动研究；手动研究仍可用。
+1. 「立即研究」或每日定时 → DSH 新建一个普通会话，agent 读取偏好与待研究问题，用 `web_search` / `web_fetch` 查原文。
+2. agent 只把有逐字引文的结论写进 `inbox/`（`knowledge_capture`），并写当天 `briefs/`。
+3. 你在「知识工作台 → 收件箱」读卡片，或直接打开 Obsidian Bases 的 `知识工作台.base`：确认入库、暂缓、跳过、恢复待审阅、删除，或「继续深挖」把问题加入队列。
+4. 确认后卡片移动到 `library/`；删除只移走候选，不影响已入库笔记。
 
-DeepSeek 使用 `deepseek-flash` 和 Messages API。研究使用独立 Search / Fetch 接口，原文按来源保留在运行记录中。需要具有这些接口使用权限及余额的 DeepSeek API Key。对话、相关偏好、匹配到的知识卡和研究材料会随相应请求提交给 DeepSeek。
+只有你能确认入库；agent 没有发布工具。
 
-## 文件与恢复
+## Obsidian Bases 数据库
 
-| 位置 | 内容 |
+插件在 `<vault>/知识工作台.base` 生成一个 Obsidian Bases 文件，把笔记属性当作列：
+
+| 视图 | 内容 |
 | --- | --- |
-| `vault/Agent/规则.md` | 每次任务读取的协作规则 |
-| `vault/Agent/偏好.md` | 用户可编辑的偏好笔记，Agent 提取的偏好有单独标记段 |
-| `vault/Agent/待研究.md` | 可手工追加的问题，研究时会读入 |
-| `vault/每日审阅/` | 当日简报与候选卡片 |
-| `vault/知识库/` | 用户确认后发布的 Markdown 笔记 |
-| `.wu-agent/events/` | 持久事件及 pending / running / done / failed 状态 |
-| `.wu-agent/runs/` | 研究计划、查询、抓取正文和卡片检查点 |
-| `.wu-agent/sessions/` | 聊天记录和完整模型响应 |
-| `.wu-agent/outbox/` | 浏览器收到的提问、日报和发布结果 |
-| `.wu-agent/profile.json` | 明确提供的研究偏好和交付设置 |
-| `.wu-agent/followups/` | 用户添加、移除和研究完成的后续问题 |
-| `.wu-agent/receipts/` | 被确认版本的内容哈希及发布记录 |
+| 待审阅 | `inbox/` 里 `review == "待审阅"` 的卡片，按创建日倒序，带摘要、标签和来源数 |
+| 收件箱（全部） | 所有候选卡，按 `review` 分组（待审阅 / 暂缓 / 跳过 / 确认） |
+| 知识库 | `library/` 的卡片视图 |
+| 知识库（表格） | `library/` 的表格，带来源链接 |
+| 研究简报 | `briefs/` 的每日简报，带今日重点和问题数 |
+| 全部笔记 | 最近修改的 Markdown 文件，便于直接跳到源文件 |
 
-每个事件一个 JSON 文件，使用同卷临时文件加 rename 或 hard link 提交。单进程锁保证同一个状态目录只由一个服务执行。研究在计划、每次搜索、每次抓取、卡片生成、交付之间保存检查点。用户回复和审阅事件优先于下一步研究。网络失败有限重试，最终失败显示在界面，可手动重试。
+卡片上的数据库属性由 `knowledge_capture` 写入：
 
-候选卡的 `id` 和 `version` 用于关联运行记录，请保留。确认事件保存用户确认时的完整内容，发布前检查内容是否变化。相同卡片的相同确认重试会复用已发布结果。已发布后修改候选卡会提示冲突，用户可以直接在 Obsidian 编辑正式笔记。
+- `title`、`summary`、`review`、`created`、`approved`、`tags`
+- `source_count`（数字）和 `sources`（URL 列表）
 
-模型输出的引文必须能在实际抓取的正文中匹配。这个检查验证出处和摘录一致性，结论是否被证据充分支持仍需要审阅。每轮研究有独立的计划和简报，失败可从界面重试。配置的查询数和来源数约束一个已保存的计划，网络中断或崩溃可能重试尚未保存响应的请求并再次计费。
+`.base` 文件只在缺失时生成。**你在 Obsidian 里改过的视图、列、筛选和排序不会被插件覆盖**；删掉该文件后，下一次刷新工作台会重新生成默认版本。
 
-研究追问采用异步排队及状态刷新，已有上下文按最近对话、偏好、任务问题和相关知识加载。用「回复追问」发送的消息会带上原问题，即使它来自先前的日报。用户未回复时其他任务仍可运行。研究历史的后续建议会提供给下一次计划；显式加入待研究的问题会优先处理。
+## 审阅的权威来源
+
+候选卡片就是普通 Markdown，两种确认方式等价：
+
+1. 在侧栏「知识工作台」点「确认入库」；
+2. 在 Obsidian Bases 表格（或笔记属性）里把 `review` 改成 `确认`。工作台每 15 秒刷新、手动刷新或下次 `knowledge_status` 时会扫描并发布。
+
+确认时把**当前文件内容**移动到 `library/`，所以确认前在 Obsidian 里的编辑会一起入库。扫描只接受 frontmatter `id` 与文件名一致的候选卡，且目标已存在时不会覆盖。
+
+## 仓库结构
+
+```
+<vault>/
+  知识工作台.base   Obsidian Bases 数据库（视图、筛选、列、排序）
+  inbox/           候选卡片（frontmatter 带 review: 待审阅）
+  library/         确认后的正式笔记
+  briefs/          每天一份研究简报
+  偏好.md          兴趣 / 基础 / 目标 / 阅读习惯的镜像
+  待研究.md        后续问题镜像；追加 `- 问题` 也会进队列
+  .workbench/      状态、回收站、临时写入
+```
+
+默认 vault 是 `~/Documents/DSH知识库`。可以在 profile 的 `cordis.patch.yml` 里给这一行加 `config.vault` 改到别处，例如指向已有的 Obsidian 仓库：
+
+```yaml
+- id: knowledge-workbench
+  name: '@local/dsh-knowledge-workbench'
+  config:
+    vault: 'D:\Notes\悟'
+```
+
+`config.timeZone` 可覆盖日期所用时区（默认取本机时区）。
+
+## 实现
+
+| 文件 | 职责 |
+| --- | --- |
+| `index.js` | Host 半：vault 配置、浏览器 JSON API、`schedule` 排程、工具注册 |
+| `lib/store.js` | Markdown 仓库：候选卡、审阅迁移、偏好与问题镜像、简报、检索 |
+| `lib/tools.js` | 六个 agent 工具（原始 JSON Schema，不依赖 DSH 内部包） |
+| `lib/note.js` | frontmatter 读写、卡片渲染、日期与 note id |
+| `lib/bases.js` | Obsidian Bases 文件内容与属性确认常量 |
+| `lib/research.js` | 每日/立即研究的提示词与时间校验 |
+| `client.js` | 浏览器半：侧栏入口 + 知识工作台整页（分栏布局、快捷键、只读主题 token） |
+| `locale/` | 中英文插件标题与详情 |
+| `docs/` | 插件详情页配图 |
+
+浏览器半只调用 Host 注册的 `/plugin/dsh-knowledge-workbench` 路由；该路由校验 Host 与浏览器会话（`ctx.connection.requestRejection`），只服务本机页面。
 
 ## 验证
 
-执行 `node --test`。测试使用本地 HTTP 服务模拟 DeepSeek API，覆盖流式对话、附件上传、语音接口、研究恢复、时区调度、失败重试、后续问题、追问上下文和知识库搜索。实际 API 连通性需配置有效 Key 后验证。
+```powershell
+node --test
+```
 
-配置 Key 后，执行 `node scripts/live-smoke.mjs` 可运行真实接口验收。该脚本在 `.wu-agent/live-smoke-*` 下创建独立的状态和 Vault，执行一次对话、一个搜索词、一次网页抓取和最多一张卡片生成，再通过修改测试笔记的 `review` 属性验证发布。它会产生 DeepSeek API 用量，生成的卡片留在测试目录供检查。
+测试覆盖仓库读写、Bases 文件生成（不覆盖用户编辑）、审阅迁移与恢复、在 Bases 里改 `review` 的确认路径、偏好与问题镜像、从 Obsidian 追加问题、简报字段、检索，以及浏览器 API 的鉴权、审阅、偏好、追问和排程请求体、六个工具的执行链路。`test/client.test.mjs` 另外守住浏览器半的界面约定：只用主题 token（含 `color-mix`，不出现字面颜色）、不引用 Harness Client 包、中英文字典键一致，并保留审阅动作、标签页与键盘操作。
 
-## 参考
-
-- [DeepSeek 构建 Chatbot](https://api-docs.deepseek.com/zh-cn/guides/build_a_chatbot/)
-- [DeepSeek chat-demo](https://github.com/deepseek-ai/chat-demo)
-- [DeepSeek Search / Fetch](https://api-docs.deepseek.com/zh-cn/guides/search/)
-- [Building always-on agents](https://claude.com/resources/articles/building-always-on-agents)
-
-工作台和本地运行器为项目实现，完整对话集成官方 Chat Demo。API 用法和事件驱动结构参考上述资料。
+UI 渲染需要在 DSH 页面里人工确认；Host 半的安装状态、工具注册、槽位注册与接口鉴权可通过 DSH 的运行时检查验证。

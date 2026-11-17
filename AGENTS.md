@@ -1,32 +1,41 @@
 # Repository Guidelines
 
+This repository is a DeepSeek Harness plugin bundle, not a standalone app. Its root is the package: `package.json` declares the bundle patch and the browser half.
+
 ## Project Structure & Module Organization
 
-- `src/` contains the Node.js service. `server.mjs` serves the workbench and HTTP API, `agent.mjs` runs research and review workflows, `deepseek.mjs` and `chat-demo.mjs` handle DeepSeek integration, and `notebook.mjs` and `files.mjs` handle notes and persistence.
-- `public/` contains the workbench HTML, CSS, browser modules, and static assets. `public/chat-demo/` ships the built DeepSeek Chat Demo. Make integration changes in `scripts/chat-demo/` or `scripts/patch-chat-demo.mjs`, then regenerate the bundle.
-- `test/` contains the research and workbench tests (`mvp.test.mjs`) and the chat integration tests (`chat-demo.test.mjs`).
+- `index.js` — Host half: vault configuration, the browser JSON API under `/plugin/dsh-knowledge-workbench`, the `schedule` integration, and tool registration.
+- `lib/store.js` — vault operations: candidate cards, review transitions, preference/question mirrors, briefs, search.
+- `lib/tools.js` — the six agent tools. Keep raw JSON Schema shapes; this bundle intentionally imports nothing from the DSH installation.
+- `lib/note.js` — frontmatter parsing/rendering, card rendering, dates, note ids.
+- `lib/bases.js` — the Obsidian Bases `.base` document and the `确认` review constant. The file is seeded only when missing; never overwrite a user's edited base.
+- `lib/research.js` — daily and on-demand research prompts plus time validation.
+- `client.js` — browser half, registered through `window.__ModuleLoader__.load`. It must not import Harness Client packages; render controls with React elements and style only with `--dsw-alias-*` tokens.
+- `locale/` — `meta.title`, `meta.description`, and `meta.detail` for Plugin Manager.
+- `docs/` — the single-image detail documents.
+- `test/` — `node:test` suites for the store, browser API, and tool definitions.
 
 ## Build, Test, and Development Commands
 
-Use Node.js 22.12 or newer. The main app has no runtime dependencies or build step.
+Use Node.js 22.12 or newer. There is no build step and no runtime dependency.
 
-- `npm start` runs the workbench at `http://127.0.0.1:4317` by default. Restart after editing server code, static assets, or `.env`.
-- `start.cmd` launches the app and opens the browser on Windows. Use `start.cmd --no-open` to skip opening it.
-- `npm test` runs the full test suite. `node --test test/chat-demo.test.mjs` runs just the chat tests.
-- `./scripts/build-chat-demo.ps1` rebuilds the bundled Chat Demo from a pinned upstream revision. Run it in PowerShell with `pnpm` available.
+- `node --test` (or `npm test`) runs the suite.
+- `node --check index.js` — syntax check the Host half; repeat for `client.js` and every `lib/*.js`.
+- Install or update the plugin through DSH **Plugins → Add plugin → local directory** (repo root). In a management session, `plugin_manager install_bundle` with the absolute repo path performs the same install.
+- While developing, DSH HMR reloads changed bundle files after the next profile recomposition (for example, toggling the plugin row); the browser half reloads through client HMR.
 
 ## Coding Style & Naming Conventions
 
-Use two spaces, single quotes, semicolons, and `camelCase` for functions and variables. Keep server modules in ES module `.mjs` files and workbench browser modules in `.js` files. Prefer Node built-ins. No formatter or lint script is configured.
+Two spaces, single quotes, semicolons, `camelCase` for functions and variables. Keep runtime modules as ES modules. Prefer Node built-ins; do not add dependencies without a clear reason. No formatter or lint script is configured.
 
 ## Testing Guidelines
 
-Use `node:test` and `node:assert/strict` in `test/*.test.mjs`. Use descriptive test names, temporary state and vault directories, and local HTTP mocks for DeepSeek calls. Add regression cases for changed behavior; no numerical coverage threshold is configured. For live API verification, run `node scripts/live-smoke.mjs` with a valid key. It consumes API quota.
+Use `node:test` and `node:assert/strict` under `test/*.test.mjs`. Use temporary vault directories (`fs.mkdtemp`), never the user's real vault. Cover the Bases seed, the `review: 确认` publish path, and card database properties when changing them. Add regression cases for behavior changes; no coverage threshold is configured.
 
 ## Commits & Pull Requests
 
-Use short, imperative commit subjects, such as `Fix review retry handling`. In pull requests, describe the behavior change, list the checks run, link related issues, and include screenshots for visible UI changes.
+Short imperative subjects, such as `Fix card delete confirmation`. In a pull request, describe the behavior change, list the checks run, and call out anything that was not verified in a live browser.
 
 ## Local Configuration
 
-Copy `.env.example` to `.env` and set `DEEPSEEK_API_KEY` for live calls. Keep `.env`, `.wu-agent/` runtime data, and personal `vault/` notes out of commits.
+The vault path is row configuration (`config.vault`), not an environment file. The default is `~/Documents/DSH知识库`. Do not commit generated vault contents, `node_modules/`, or logs.
